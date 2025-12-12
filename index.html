@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Simulasi Fisika Gerak Parabola Lisa Comel 💗</title>
+    <style>
+      body {
+        margin: 0;
+        background: linear-gradient(#ffe8f4, #ffdff1, #ffeef8);
+        font-family: Arial, sans-serif;
+        user-select: none;
+      }
+
+      #gameContainer {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+      }
+
+      canvas {
+        background: linear-gradient(#ffd9ec 0%, #ffe7f5 40%, #fff0fa 60%);
+        border: 2px solid #555;
+      }
+
+      #panel {
+        width: 95%;
+        max-width: 900px;
+        background: white;
+        padding: 15px;
+        margin: 20px auto;
+        border-radius: 12px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.15);
+      }
+
+      h2 {
+        margin-top: 0;
+      }
+
+      input[type="range"] {
+        width: 100%;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+
+      table td {
+        border: 1px solid #333;
+        padding: 6px;
+        background: #fafafa;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 🔊 Tambahan suara -->
+    <audio
+      id="shootSound"
+      src="https://actions.google.com/sounds/v1/impacts/metal_impact.ogg"
+    ></audio>
+    <audio
+      id="hitSound"
+      src="https://actions.google.com/sounds/v1/impacts/cartoon_boing.ogg"
+    ></audio>
+
+    <div id="gameContainer">
+      <canvas id="canvas" width="900" height="450"></canvas>
+    </div>
+
+    <div id="panel">
+      <h2>Pengaturan Simulasi</h2>
+
+      Sudut (°)<br />
+      <input type="range" id="angleSlider" min="0" max="89" value="45" />
+      <span id="angleLabel">45°</span>
+      <br /><br />
+
+      Kecepatan Awal (m/s)<br />
+      <input type="range" id="speedSlider" min="10" max="100" value="50" />
+      <span id="speedLabel">50 m/s</span>
+      <br /><br />
+
+      Posisi Awal X (px)<br />
+      <input type="range" id="startSlider" min="20" max="200" value="80" />
+      <span id="startLabel">80 px</span>
+      <br /><br />
+
+      Gravitasi (m/s²)<br />
+      <input type="range" id="gravitySlider" min="1" max="20" value="10" />
+      <span id="gravityLabel">10 m/s²</span>
+      <br /><br />
+
+      Posisi Target X (px)<br />
+      <input type="range" id="targetSlider" min="300" max="850" value="650" />
+      <span id="targetLabel">650 px</span>
+      <br /><br />
+
+      <button
+        id="btnShoot"
+        style="
+          padding: 10px 18px;
+          background: #ff88c7;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          color: white;
+          cursor: pointer;
+        "
+      >
+        TEMBAK 💗
+      </button>
+
+      <h2>Hasil Perhitungan</h2>
+
+      <table>
+        <tr>
+          <td>Sudut</td>
+          <td id="outAngle">-</td>
+        </tr>
+        <tr>
+          <td>Kecepatan Awal</td>
+          <td id="outSpeed">-</td>
+        </tr>
+        <tr>
+          <td>Waktu Total</td>
+          <td id="outTime">-</td>
+        </tr>
+        <tr>
+          <td>Tinggi Maksimum</td>
+          <td id="outHmax">-</td>
+        </tr>
+        <tr>
+          <td>Jarak Jatuh</td>
+          <td id="outRange">-</td>
+        </tr>
+        <tr>
+          <td>Posisi Target</td>
+          <td id="outTarget">-</td>
+        </tr>
+        <tr>
+          <td>Error Jarak</td>
+          <td id="outError">-</td>
+        </tr>
+      </table>
+    </div>
+
+    <script>
+      /* ————————————————————————————
+   KODE ASLI KAMU (TIDAK DIUBAH)
+   ———————————————————————————— */
+
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      let groundY = 380;
+      let angle = 45;
+      let speed = 50;
+
+      let startX = 80;
+      let gravity = 10;
+
+      let targetX = 650;
+      let targetY = groundY - 50;
+
+      let projectile = null;
+      let landedProjectiles = [];
+
+      let clouds = [
+        { x: 100, y: 60 },
+        { x: 300, y: 40 },
+        { x: 550, y: 70 },
+        { x: 750, y: 50 },
+      ];
+
+      function drawCloud(x, y) {
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(x, y, 20, 0, Math.PI * 2);
+        ctx.arc(x + 25, y + 5, 25, 0, Math.PI * 2);
+        ctx.arc(x - 25, y + 5, 18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawRuler() {
+        ctx.fillStyle = "black";
+        for (let i = 0; i <= 900; i += 50) {
+          ctx.fillRect(i, groundY + 5, 2, 10);
+          ctx.fillText(i, i + 2, groundY + 25);
+        }
+      }
+
+      function drawTank() {
+        ctx.save();
+        ctx.translate(startX, groundY - 20);
+
+        ctx.fillStyle = "#ff66b7";
+        ctx.fillRect(-25, -15, 50, 20);
+
+        let rad = (-angle * Math.PI) / 180;
+        ctx.rotate(rad);
+        ctx.fillRect(0, -4, 40, 8);
+
+        ctx.restore();
+      }
+
+      function drawTarget() {
+        ctx.save();
+        ctx.translate(targetX, targetY);
+        ctx.fillStyle = "#ffaad9";
+        ctx.fillRect(-10, -40, 20, 40);
+
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(0, -50, 25, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(0, -50, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      function drawProjectileBall(x, y) {
+        ctx.fillStyle = "#444";
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function shoot() {
+        // 🔊 suara tembak
+        document.getElementById("shootSound").currentTime = 0;
+        document.getElementById("shootSound").play();
+
+        const rad = (angle * Math.PI) / 180;
+        const v0x = speed * Math.cos(rad);
+        const v0y = speed * Math.sin(rad);
+
+        projectile = {
+          x: startX + 40 * Math.cos(rad),
+          y: groundY - 20 - 40 * Math.sin(rad),
+          vx: v0x,
+          vy: -v0y,
+          t: 0,
+        };
+
+        calculatePhysics();
+      }
+
+      function calculatePhysics() {
+        const g = gravity;
+        const rad = (angle * Math.PI) / 180;
+
+        const tFlight = (2 * speed * Math.sin(rad)) / g;
+        const hMax = (speed ** 2 * Math.sin(rad) ** 2) / (2 * g);
+        const range = (speed ** 2 * Math.sin(2 * rad)) / g;
+
+        const impactX = startX + range;
+        const error = Math.abs(impactX - targetX);
+
+        document.getElementById("outAngle").textContent = angle + "°";
+        document.getElementById("outSpeed").textContent = speed + " m/s";
+        document.getElementById("outTime").textContent =
+          tFlight.toFixed(2) + " s";
+        document.getElementById("outHmax").textContent = hMax.toFixed(2) + " m";
+        document.getElementById("outRange").textContent =
+          range.toFixed(2) + " m";
+        document.getElementById("outTarget").textContent = targetX + " px";
+        document.getElementById("outError").textContent =
+          error.toFixed(2) + " px";
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        clouds.forEach((c) => drawCloud(c.x, c.y));
+        drawRuler();
+
+        /* 🎯 busur lintasan titik-titik */
+        drawArcPreview();
+
+        drawTank();
+        drawTarget();
+
+        landedProjectiles.forEach((p) => drawProjectileBall(p.x, p.y));
+
+        if (projectile) {
+          projectile.t += 0.05;
+          const g = gravity;
+
+          projectile.x += projectile.vx * 0.05;
+          projectile.y += projectile.vy * 0.05 + 0.5 * g * projectile.t * 0.05;
+
+          drawProjectileBall(projectile.x, projectile.y);
+
+          // 💥 ledakan + suara jika kena target
+          if (
+            Math.abs(projectile.x - targetX) < 15 &&
+            projectile.y < targetY + 5
+          ) {
+            createExplosion(projectile.x, projectile.y);
+            document.getElementById("hitSound").currentTime = 0;
+            document.getElementById("hitSound").play();
+          }
+
+          // jatuh → diam
+          if (projectile.y >= groundY) {
+            projectile.y = groundY;
+            landedProjectiles.push({ x: projectile.x, y: groundY });
+            projectile = null;
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      animate();
+
+      /* ————————————————
+   SLIDERS
+   ———————————————— */
+
+      document.getElementById("angleSlider").oninput = function () {
+        angle = Number(this.value);
+        document.getElementById("angleLabel").textContent = angle + "°";
+      };
+
+      document.getElementById("speedSlider").oninput = function () {
+        speed = Number(this.value);
+        document.getElementById("speedLabel").textContent = speed + " m/s";
+      };
+
+      document.getElementById("startSlider").oninput = function () {
+        startX = Number(this.value);
+        document.getElementById("startLabel").textContent = startX + " px";
+      };
+
+      document.getElementById("gravitySlider").oninput = function () {
+        gravity = Number(this.value);
+        document.getElementById("gravityLabel").textContent = gravity + " m/s²";
+      };
+
+      document.getElementById("targetSlider").oninput = function () {
+        targetX = Number(this.value);
+        document.getElementById("targetLabel").textContent = targetX + " px";
+      };
+
+      document.getElementById("btnShoot").onclick = function () {
+        shoot();
+      };
+
+      /* ——————————————————————————
+   ⭐⭐ TAMBAHAN FUNGSI BARU ⭐⭐
+   —————————————————————————— */
+
+      /* 🎯 Busur lintasan titik-titik */
+      function drawArcPreview() {
+        const rad = (angle * Math.PI) / 180;
+        const v0x = speed * Math.cos(rad);
+        const v0y = speed * Math.sin(rad);
+        const g = gravity;
+
+        let px0 = startX + 40 * Math.cos(rad);
+        let py0 = groundY - 20 - 40 * Math.sin(rad);
+
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+
+        for (let t = 0; t < 5; t += 0.1) {
+          let x = px0 + v0x * t;
+          let y = py0 - v0y * t + 0.5 * g * t * t;
+
+          if (y > groundY) break;
+
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      /* 💥 Ledakan lucu warna pink */
+      let explosions = [];
+
+      function createExplosion(x, y) {
+        explosions.push({ x, y, r: 0, life: 1 });
+      }
+
+      function drawExplosions() {
+        for (let i = explosions.length - 1; i >= 0; i--) {
+          let e = explosions[i];
+          e.r += 2;
+          e.life -= 0.02;
+
+          ctx.fillStyle = `rgba(255,150,200,${e.life})`;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (e.life <= 0) explosions.splice(i, 1);
+        }
+      }
+
+      setInterval(drawExplosions, 16);
+    </script>
+  </body>
+</html>
